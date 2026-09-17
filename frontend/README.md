@@ -49,9 +49,6 @@ A modular monolith e-commerce application built with Spring Boot, PostgreSQL (Su
 ### Rejected Order - Insufficient Stock (HTTP 400 / Business Exception)
 ![Rejected Order](./images/rejected_order.png)
 
-**Confirmed Order (HTTP 200 / 201)**
-
-**Rejected Order - Insufficient Stock (HTTP 400 / Business Exception)**
 
 1. **In-Process Integration vs. Microservices over a Network**
 
@@ -102,3 +99,71 @@ A modular monolith e-commerce application built with Spring Boot, PostgreSQL (Su
 - **Data Transfer Objects (DTOs):** Introduce network-safe payload serializations rather than referencing shared internal entity classes directly.
 
 - **Asynchronous Messaging:** Refactor synchronous transaction logic to use asynchronous event streaming (e.g., Apache Kafka or RabbitMQ) to handle stock updates via eventual consistency.
+
+1. Spring Boot Terminal Logs (Event-Driven Workflow)
+   ![Rejected Order](./images/Noti.png)
+
+
+2. React UI - Active Order & Stock Table
+   ![Rejected Order](./images/Cart.png)
+
+3. React UI - Order Cancellation
+   ![Rejected Order](./images/History.png)
+
+4. Supabase Database Persistence
+   ![Rejected Order](./images/Order_items.png)
+
+
+5. Package Hierarchy (Modular Monolith Boundaries)
+   ![Rejected Order](./images/Backend.png)
+
+Architectural Discussion Questions
+In-Process Integration vs. Microservices over a Network
+
+Integrating the Order and Inventory modules in-process within a modular monolith offers significant operational simplicity. Because both modules reside in the same runtime memory space, calls between them execute via standard Java method invocations rather than network protocols like HTTP or gRPC.
+
+What you get for free:
+
+- Zero Network Overhead: Method calls execute in microseconds with no network latency, socket overhead, or payload serialization/deserialization penalties.
+
+- ACID Transactions: Order placement and inventory reservation happen inside a single @Transactional database boundary. If writing the order fails, the inventory deduction rolls back atomically without requiring eventual consistency patterns.
+
+- Operational Simplicity: Deployment, logging, and monitoring are managed under a single service artifact without needing distributed tracing tools.
+
+What you would need to add back if split into Microservices:
+
+- Resilience Patterns: Circuit breakers, retries, timeouts, and fallbacks to manage network flakiness.
+
+- Distributed Transactions: Saga patterns (orchestrated or choreographed) or transactional outboxes to preserve consistency across separate databases.
+
+- Service Infrastructure: API gateways, service registries, and security mechanisms like OAuth/JWT for service-to-service authentication.
+
+Importance of Package-Private Visibility on InventoryServiceImpl
+
+Applying package-private visibility to InventoryServiceImpl establishes a strict compile-time boundary between modules. In Java, package-private components cannot be accessed outside their declaring package (edu.cit.caaway.inventory).
+
+Why it matters & what breaks if public:
+
+- Encapsulation Protection: Making InventoryServiceImpl package-private guarantees that the shop module (edu.cit.caaway.shop) can only interact with inventory operations via the explicit InventoryService interface.
+
+- Preventing Tight Coupling: If InventoryServiceImpl were made public, developers could bypass the interface, instantiate concrete classes, or invoke internal package methods directly.
+
+- Fragile Architecture: Allowing external modules to depend on implementation details makes future refactoring difficult—changes to the internal logic of the inventory module would break dependent code in other modules across the application.
+
+Extracting Inventory into a Microservice & Code Changes
+
+When to Extract:
+
+- Independent Scaling: If inventory lookup traffic drastically exceeds order placement volume (e.g., thousands of reads per second during sale events), scaling the inventory module independently becomes cost-effective.
+
+- Domain & Organizational Boundaries: When a dedicated engineering team takes full ownership of inventory domain logic, requiring distinct deployment pipelines and isolated databases.
+
+Necessary Code Changes:
+
+- Network Client Abstraction: Replace direct method calls to InventoryService inside OrderService with an HTTP REST client (such as Spring's RestClient or OpenFeign) or a gRPC stub.
+
+- Database Separation: Split the database schema into two distinct physical databases—one for orders and one for inventory.
+
+- Data Transfer Objects (DTOs): Introduce network-safe payload serializations rather than referencing shared internal entity classes directly.
+
+- Asynchronous Messaging: Refactor synchronous transaction logic to use asynchronous event streaming (e.g., Apache Kafka or RabbitMQ) to handle stock updates via eventual consistency.

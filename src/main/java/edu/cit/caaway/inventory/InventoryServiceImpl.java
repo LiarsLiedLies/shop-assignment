@@ -1,41 +1,55 @@
 package edu.cit.caaway.inventory;
 
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
-import java.util.Optional;
 
 @Service
-class InventoryServiceImpl implements InventoryService {
+class InventoryServiceImpl implements InventoryService { // Package-private!
 
+    private static final int LOW_STOCK_THRESHOLD = 5;
     private final InventoryRepository inventoryRepository;
+    private final ApplicationEventPublisher eventPublisher;
 
-    InventoryServiceImpl(InventoryRepository inventoryRepository) {
+    InventoryServiceImpl(InventoryRepository inventoryRepository, ApplicationEventPublisher eventPublisher) {
         this.inventoryRepository = inventoryRepository;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
-    public Optional<InventoryItem> getItem(String productId) {
-        return inventoryRepository.findById(productId);
-    }
-
-    @Override
-    public List<InventoryItem> getAllItems() {
+    public List<InventoryItem> getAllInventory() {
         return inventoryRepository.findAll();
     }
 
     @Override
+    public boolean validateStock(String productId, int quantity) {
+        return inventoryRepository.findById(productId)
+                .map(item -> item.getStock() >= quantity)
+                .orElse(false);
+    }
+
+    @Override
     @Transactional
-    public boolean reserve(String productId, int quantity) {
-        Optional<InventoryItem> itemOpt = inventoryRepository.findById(productId);
-        if (itemOpt.isPresent()) {
-            InventoryItem item = itemOpt.get();
-            if (item.getStock() >= quantity) {
-                item.setStock(item.getStock() - quantity);
-                inventoryRepository.save(item);
-                return true;
-            }
+    public void reserveStock(String productId, int quantity) {
+        InventoryItem item = inventoryRepository.findById(productId)
+                .orElseThrow(() -> new IllegalArgumentException("Product not found: " + productId));
+
+        item.setStock(item.getStock() - quantity);
+        inventoryRepository.save(item);
+
+        // Emit low-stock event if stock falls below threshold
+        if (item.getStock() < LOW_STOCK_THRESHOLD) {
+            eventPublisher.publishEvent(new LowStockEvent(productId, item.getStock()));
         }
-        return false;
+    }
+
+    @Override
+    @Transactional
+    public void restock(String productId, int quantity) {
+        InventoryItem item = inventoryRepository.findById(productId)
+                .orElseThrow(() -> new IllegalArgumentException("Product not found: " + productId));
+        item.setStock(item.getStock() + quantity);
+        inventoryRepository.save(item);
     }
 }
