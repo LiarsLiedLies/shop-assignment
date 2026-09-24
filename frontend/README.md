@@ -33,14 +33,14 @@ A modular monolith e-commerce application built with Spring Boot, PostgreSQL (Su
    ('PROD-001', 'Wireless Mouse', 10),
    ('PROD-002', 'Mechanical Keyboard', 5),
    ('PROD-003', 'USB-C Cable', 0);
-
+   ```
 3. **Configure Connection:** In src/main/resources/application.properties, update your datasource URL and credentials. Note the addition of prepareThreshold=0 to support Supabase's transaction pooler:
    ```sql
    Properties
     spring.datasource.url=jdbc:postgresql://<your-supabase-host>:6543/postgres?sslmode=require&prepareThreshold=0
     spring.datasource.username=postgres.<your-ref>
     spring.datasource.password=<your-password>
-
+   ```
 ## Network Tab Evidence
 
 ### Confirmed Order (HTTP 200 / 201)
@@ -101,21 +101,25 @@ A modular monolith e-commerce application built with Spring Boot, PostgreSQL (Su
 - **Asynchronous Messaging:** Refactor synchronous transaction logic to use asynchronous event streaming (e.g., Apache Kafka or RabbitMQ) to handle stock updates via eventual consistency.
 
 1. Spring Boot Terminal Logs (Event-Driven Workflow)
-   ![Rejected Order](./images/Noti.png)
 
+![Notifications Table](./images/Noti.png)
 
 2. React UI - Active Order & Stock Table
-   ![Rejected Order](./images/Cart.png)
+
+![Dashboard & Active Cart](./images/Cart.png)
 
 3. React UI - Order Cancellation
-   ![Rejected Order](./images/History.png)
+
+![Order History](./images/History.png)
 
 4. Supabase Database Persistence
-   ![Rejected Order](./images/Order_items.png)
 
+![Orders Table](./images/Orders.png)
+![Order Items Table](./images/Order_items.png)
 
 5. Package Hierarchy (Modular Monolith Boundaries)
-   ![Rejected Order](./images/Backend.png)
+
+![Package Structure](./images/Backend.png)
 
 Architectural Discussion Questions
 In-Process Integration vs. Microservices over a Network
