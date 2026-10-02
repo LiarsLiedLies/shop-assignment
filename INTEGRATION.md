@@ -1,11 +1,6 @@
-# LegacySupply integration notes
-
-Client ID `18-5617-151`, base URL `https://legacysupply.onrender.com/api/v1`.
-Everything below was observed with curl on 2026-10-02 (times are UTC) or in the application log, unless it says "manual".
+# LegacySupply integration notes & observations
 
 ## 1. Product mapping
-
-From `GET /catalog` for my client ID. The catalog has 10 items; these three are the ones my Inventory sells.
 
 | My product ID | My product name     | LegacySupply SupplierSku | LegacySupply Description | PackSize |
 |---------------|---------------------|--------------------------|--------------------------|----------|
@@ -13,7 +8,7 @@ From `GET /catalog` for my client ID. The catalog has 10 items; these three are 
 | PROD-002      | Wireless Mouse      | LPB-1517                 | WIRELESS MOUSE 2.4GHZ    | 6        |
 | PROD-003      | Mechanical Keyboard | LPB-1455                 | KEYBOARD MECH TKL        | 24       |
 
-The mapping lives only in `supplier/SupplierCatalog.java`. Inventory and Order know product IDs and single units, nothing else.
+The mapping lives only in `supplier/SupplierCatalog.java`. Inventory and Order know product IDs and single units.
 
 ## 2. Sessions
 
