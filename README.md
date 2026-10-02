@@ -55,7 +55,7 @@ A modular monolith e-commerce application built with Spring Boot, PostgreSQL (Su
 
 1. **In-Process Integration vs. Microservices over a Network**
 
-   Integrating the Order and Inventory modules in-process within a modular monolith offers significant operational simplicity. Because both modules reside in the same runtime memory space, calls between them execute via standard Java method invocations rather than network protocols like HTTP or gRPC.
+   Integrating the Order and Inventory modules in-process within a modular monolith offers sfignificant operational simplicity. Because both modules reside in the same runtime memory space, calls between them execute via standard Java method invocations rather than network protocols like HTTP or gRPC.
 
 **What you get for free:**
 
@@ -107,9 +107,7 @@ A modular monolith e-commerce application built with Spring Boot, PostgreSQL (Su
 
 ## Lab 3: LegacySupply integration
 
-The Low-Stock Auto-Reorder Rule now places real purchase orders through an Anti-Corruption Layer in `edu.cit.caaway.supplier`. Contract notes are in [INTEGRATION.md](INTEGRATION.md), reflection answers in [REFLECTION.md](REFLECTION.md).
-
-**API key:** it is not in this repository. Before starting the app, either set the `LS_API_KEY` environment variable or create a `secrets.properties` file next to `pom.xml` (ignored by Git) containing one line: `LS_API_KEY=LSK-...`
+The Low-Stock Auto-Reorder Rule now places real purchase orders through a layer in `edu.cit.caaway.supplier`.
 
 **How a reorder flows:**
 
@@ -118,13 +116,11 @@ The Low-Stock Auto-Reorder Rule now places real purchase orders through an Anti-
 3. `SupplierOrderDispatcher` (scheduled) sends it to LegacySupply with a 3 s timeout and at most 3 attempts; if LegacySupply is down it stays `PENDING` and is sent later with the same `X-Request-Id`.
 4. `SupplierOrderTracker` (scheduled) polls open orders. On delivery a `SupplierOrderDeliveredEvent` is published, Inventory restocks the units and Notification records it.
 
-**Tests:** `./mvnw test -Dtest='LegacySupplyClientTest,SupplierTranslationTest'` runs the adapter against a local fake LegacySupply (timeouts, 503s, expired sessions) without touching the real one.
-
 ---
 
 ## Lab 4: Tiangge marketplace
 
-The shop sells on Tiangge through the `edu.cit.caaway.channel` module. Every class in it is package-private; Order and Inventory do not know Tiangge exists. Reflection answers are in [REFLECTION.md](REFLECTION.md).
+The shop sells on Tiangge through the `edu.cit.caaway.channel` module.
 
 **What the app does by itself once started:**
 
@@ -135,6 +131,4 @@ The shop sells on Tiangge through the `edu.cit.caaway.channel` module. Every cla
 5. `ChannelOrderProcessor` turns each Tiangge order into exactly one order through `OrderService` (the `channel_orders` table links them) and answers ACCEPTED, REJECTED or BACKORDERED. Customer cancellations go through `OrderService.cancelOrder`.
 6. A backorder is only used when the supplier has already accepted a purchase order that covers it. When the delivery arrives and Inventory is restocked, the backorder is filled with `OrderService.fillBackorder` and resolved.
 
-**Running:** set `LS_API_KEY` (or `secrets.properties`, see Lab 3) and start the app. Nothing else is needed.
-
-**Tests:** `./mvnw test` runs everything against a local fake Tiangge and LegacySupply with an in-memory database (`MarketplaceFlowTest`); no test touches the real services.
+Note: Contract notes are in [INTEGRATION.md](INTEGRATION.md), reflection answers in [REFLECTION.md](REFLECTION.md).
