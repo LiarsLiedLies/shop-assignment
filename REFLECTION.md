@@ -2,8 +2,6 @@
 
 # Lab 3: LegacySupply
 
-Questions copied from my self-check page (https://legacysupply.onrender.com/verify). Times in the questions are local time on 2026-09-24.
-
 ## 1. Duplicate order
 
 **Question:** LegacySupply holds more than one order for BuyerRef "REF-PROD-001-dafab921": PO-100042 (19:40:36) and PO-100043 (19:40:43). Reconstruct the sequence of events that produced the duplicate, and describe the change you made (or would make) so it cannot happen again.
@@ -25,8 +23,6 @@ Questions copied from my self-check page (https://legacysupply.onrender.com/veri
 ---
 
 # Lab 4: Tiangge Marketplace
-
-Questions copied from the Marketplace section of my self-check page on 2026-10-02. Times are local.
 
 ## 1. An event delivered twice
 
