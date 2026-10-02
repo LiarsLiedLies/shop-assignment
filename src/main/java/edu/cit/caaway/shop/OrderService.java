@@ -58,11 +58,52 @@ public class OrderService {
             throw new RuntimeException("Order is already cancelled");
         }
 
-        for (OrderItem item : order.getItems()) {
-            inventoryService.restock(item.getProductId(), item.getQuantity());
+        // Only a confirmed order took stock; a backordered or rejected one has nothing to give back.
+        if ("CONFIRMED".equals(order.getStatus())) {
+            for (OrderItem item : order.getItems()) {
+                inventoryService.restock(item.getProductId(), item.getQuantity());
+            }
         }
 
         order.setStatus("CANCELLED");
         return orderRepository.save(order);
+    }
+
+    /** Records an order that cannot be filled yet and waits for stock. Nothing is reserved. */
+    @Transactional
+    public Order placeBackorder(List<OrderItemRequest> itemRequests) {
+        Order order = new Order();
+        for (OrderItemRequest req : itemRequests) {
+            order.getItems().add(new OrderItem(order, req.productId(), req.quantity()));
+        }
+        order.setStatus("BACKORDERED");
+        order.setReason("Waiting for stock");
+        return orderRepository.save(order);
+    }
+
+    /**
+     * Tries to fill a backordered order, all-or-nothing like a new order. The order becomes
+     * CONFIRMED when every item could be reserved and is returned unchanged otherwise.
+     */
+    @Transactional
+    public Order fillBackorder(Long orderId) {
+        Order order = orderRepository.findById(orderId)
+                .orElseThrow(() -> new RuntimeException("Order not found"));
+        if (!"BACKORDERED".equals(order.getStatus())) {
+            return order;
+        }
+        for (OrderItem item : order.getItems()) {
+            if (!inventoryService.validateStock(item.getProductId(), item.getQuantity())) {
+                return order;
+            }
+        }
+        for (OrderItem item : order.getItems()) {
+            inventoryService.reserveStock(item.getProductId(), item.getQuantity());
+        }
+        order.setStatus("CONFIRMED");
+        order.setReason(null);
+        Order savedOrder = orderRepository.save(order);
+        eventPublisher.publishEvent(new OrderPlacedEvent(savedOrder.getId(), "Backorder filled."));
+        return savedOrder;
     }
 }

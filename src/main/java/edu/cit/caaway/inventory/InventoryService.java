@@ -6,6 +6,8 @@ import java.util.Optional;
 public interface InventoryService {
     List<InventoryItem> getAllInventory();
     boolean validateStock(String productId, int quantity);
+    int getAvailable(String productId);
+    boolean isLowStock(String productId);
     void reserveStock(String productId, int quantity);
     void restock(String productId, int quantity);
 }

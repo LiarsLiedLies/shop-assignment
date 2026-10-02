@@ -30,13 +30,30 @@ class InventoryServiceImpl implements InventoryService { // Package-private!
     }
 
     @Override
+    public int getAvailable(String productId) {
+        return inventoryRepository.findById(productId).map(InventoryItem::getStock).orElse(0);
+    }
+
+    @Override
+    public boolean isLowStock(String productId) {
+        return inventoryRepository.findById(productId)
+                .map(item -> item.getStock() < LOW_STOCK_THRESHOLD)
+                .orElse(false);
+    }
+
+    @Override
     @Transactional
     public void reserveStock(String productId, int quantity) {
         InventoryItem item = inventoryRepository.findById(productId)
                 .orElseThrow(() -> new IllegalArgumentException("Product not found: " + productId));
 
+        // Never sell what is not there, even if two orders are placed at the same moment.
+        if (item.getStock() < quantity) {
+            throw new IllegalStateException("Insufficient stock for product: " + productId);
+        }
         item.setStock(item.getStock() - quantity);
         inventoryRepository.save(item);
+        eventPublisher.publishEvent(new StockChangedEvent(productId, item.getStock()));
 
         // Emit low-stock event if stock falls below threshold
         if (item.getStock() < LOW_STOCK_THRESHOLD) {
@@ -51,5 +68,6 @@ class InventoryServiceImpl implements InventoryService { // Package-private!
                 .orElseThrow(() -> new IllegalArgumentException("Product not found: " + productId));
         item.setStock(item.getStock() + quantity);
         inventoryRepository.save(item);
+        eventPublisher.publishEvent(new StockChangedEvent(productId, item.getStock()));
     }
 }

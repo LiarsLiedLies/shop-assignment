@@ -1,31 +1,48 @@
 package edu.cit.caaway.inventory;
 
+import edu.cit.caaway.supplier.ReorderResult;
 import edu.cit.caaway.supplier.SupplierGateway;
-import edu.cit.caaway.supplier.SupplierOrderRequest;
-import edu.cit.caaway.supplier.SupplierOrderResponse;
+import edu.cit.caaway.supplier.SupplierOrderCancelledEvent;
+import edu.cit.caaway.supplier.SupplierOrderDeliveredEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 
 @Component
 public class InventoryEventListener {
 
-    private final SupplierGateway supplierGateway;
+    // Units asked for whenever a product runs low.
+    private static final int REORDER_UNITS = 24;
 
-    public InventoryEventListener(SupplierGateway supplierGateway) {
+    private final SupplierGateway supplierGateway;
+    private final InventoryService inventoryService;
+
+    public InventoryEventListener(SupplierGateway supplierGateway, InventoryService inventoryService) {
         this.supplierGateway = supplierGateway;
+        this.inventoryService = inventoryService;
+    }
+
+    // Low-Stock Auto-Reorder Rule
+    @EventListener
+    public void handleLowStock(LowStockEvent event) {
+        ReorderResult result = supplierGateway.requestReorder(event.productId(), REORDER_UNITS);
+        System.out.println(">>> REORDER for " + event.productId() + " (stock " + event.remainingStock() + "): "
+                + result.status() + ", " + result.unitsOrdered() + " units, " + result.message());
     }
 
     @EventListener
-    public void handleLowStock(LowStockEvent event) {
-        System.out.println("\n==========================================");
-        System.out.println(">>> REORDER NEEDED FOR PRODUCT: " + event.productId() + " (Stock Remaining: " + event.remainingStock() + ")");
+    public void handleSupplierDelivery(SupplierOrderDeliveredEvent event) {
+        inventoryService.restock(event.productId(), event.units());
+        System.out.println(">>> RESTOCKED " + event.units() + " units of " + event.productId()
+                + " from reorder " + event.reorderId());
+    }
 
-        // Trigger ACL Reorder (Hardcoded 10 units threshold reorder for demo)
-        SupplierOrderResponse response = supplierGateway.placeReorder(
-                new SupplierOrderRequest(event.productId(), 10)
-        );
-
-        System.out.println(">>> ACL REORDER RESULT: " + response.message());
-        System.out.println("==========================================\n");
+    // The goods will never arrive, so ask again if the product is still low.
+    @EventListener
+    public void handleSupplierCancellation(SupplierOrderCancelledEvent event) {
+        if (inventoryService.isLowStock(event.productId())) {
+            ReorderResult result = supplierGateway.requestReorder(event.productId(), REORDER_UNITS);
+            System.out.println(">>> REORDER for " + event.productId() + " after supplier cancellation: "
+                    + result.status() + ", " + result.message());
+        }
     }
 }

@@ -102,3 +102,39 @@ A modular monolith e-commerce application built with Spring Boot, PostgreSQL (Su
 - **Data Transfer Objects (DTOs):** Introduce network-safe payload serializations rather than referencing shared internal entity classes directly.
 
 - **Asynchronous Messaging:** Refactor synchronous transaction logic to use asynchronous event streaming (e.g., Apache Kafka or RabbitMQ) to handle stock updates via eventual consistency.
+
+---
+
+## Lab 3: LegacySupply integration
+
+The Low-Stock Auto-Reorder Rule now places real purchase orders through an Anti-Corruption Layer in `edu.cit.caaway.supplier`. Contract notes are in [INTEGRATION.md](INTEGRATION.md), reflection answers in [REFLECTION.md](REFLECTION.md).
+
+**API key:** it is not in this repository. Before starting the app, either set the `LS_API_KEY` environment variable or create a `secrets.properties` file next to `pom.xml` (ignored by Git) containing one line: `LS_API_KEY=LSK-...`
+
+**How a reorder flows:**
+
+1. Stock drops below the threshold, Inventory publishes `LowStockEvent` and calls `SupplierGateway.requestReorder(productId, units)`.
+2. The reorder is saved in `supplier_orders` as `PENDING` with `buyer_ref` = `RO-<id>` and a stored `request_id`.
+3. `SupplierOrderDispatcher` (scheduled) sends it to LegacySupply with a 3 s timeout and at most 3 attempts; if LegacySupply is down it stays `PENDING` and is sent later with the same `X-Request-Id`.
+4. `SupplierOrderTracker` (scheduled) polls open orders. On delivery a `SupplierOrderDeliveredEvent` is published, Inventory restocks the units and Notification records it.
+
+**Tests:** `./mvnw test -Dtest='LegacySupplyClientTest,SupplierTranslationTest'` runs the adapter against a local fake LegacySupply (timeouts, 503s, expired sessions) without touching the real one.
+
+---
+
+## Lab 4: Tiangge marketplace
+
+The shop sells on Tiangge through the `edu.cit.caaway.channel` module. Every class in it is package-private; Order and Inventory do not know Tiangge exists. Reflection answers are in [REFLECTION.md](REFLECTION.md).
+
+**What the app does by itself once started:**
+
+1. `ChannelHeartbeatService` sends a heartbeat at startup and every 30 s. The instance ID is new on every start (`AppInstance`) and goes on every Tiangge and LegacySupply call.
+2. `ChannelStartupRunner` publishes the products that have a supplier item as listings, then their stock.
+3. `ChannelStockSyncService` listens for Inventory's `StockChangedEvent` and publishes the new stock after the change is committed. There is no timer.
+4. `ChannelOrderPollerService` reads the order feed every 3 s. The position is stored in the `channel_cursor` table.
+5. `ChannelOrderProcessor` turns each Tiangge order into exactly one order through `OrderService` (the `channel_orders` table links them) and answers ACCEPTED, REJECTED or BACKORDERED. Customer cancellations go through `OrderService.cancelOrder`.
+6. A backorder is only used when the supplier has already accepted a purchase order that covers it. When the delivery arrives and Inventory is restocked, the backorder is filled with `OrderService.fillBackorder` and resolved.
+
+**Running:** set `LS_API_KEY` (or `secrets.properties`, see Lab 3) and start the app. Nothing else is needed.
+
+**Tests:** `./mvnw test` runs everything against a local fake Tiangge and LegacySupply with an in-memory database (`MarketplaceFlowTest`); no test touches the real services.
